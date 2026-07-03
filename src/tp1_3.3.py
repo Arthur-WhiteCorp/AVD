@@ -835,7 +835,7 @@ class ColetorBenchmarkingBD:
             else:
                 df_consolidado[metrica] = df_empilhado.mean(axis=1)        
 
-        calcular_variacao_explicada(df_consolidado, repeticoes=repeticoes)
+        calcular_variacao_explicada(df_consolidado, tabelas_de_sinais, repeticoes=repeticoes)
         print(df_consolidado.to_string())
         
 
@@ -843,7 +843,7 @@ class ColetorBenchmarkingBD:
 
 
 
-def calcular_variacao_explicada(df_consolidado, repeticoes=3):
+def calcular_variacao_explicada(df_consolidado, tabelas_de_sinais, repeticoes=3):
     """
     Calcula os efeitos (q) e a porção de variação explicada para um modelo 2^3 r
     Baseado na métrica 'tuplas_milissegundo'
@@ -893,13 +893,34 @@ def calcular_variacao_explicada(df_consolidado, repeticoes=3):
         porcentagem = (parcelas_sst[f] / sst_total_efeitos) * 100 if sst_total_efeitos > 0 else 0
         print(f"{f:<4}: {parcelas_sst[f]:.2f}/{sst_total_efeitos:.2f} ({porcentagem:.1f}%)")
     print("------------------------------------------------\n")
-    
+
+    print("\n================================================")
+    print("CÁLCULO DO ERRO EXPERIMENTAL")
+    print("================================================")
+
+    df_all = pd.concat(tabelas_de_sinais, ignore_index=True)
+    grand_mean = df_all['tuplas_milissegundo'].mean()
+
+    ss_total = ((df_all['tuplas_milissegundo'] - grand_mean) ** 2).sum()
+    ss_erro = ss_total - sst_total_efeitos
+    variacao = (sst_total_efeitos / ss_total * 100) if ss_total > 0 else 0
+
+    print(f"SST total: {ss_total:>10.2f}")
+    print(f"SST dos efeitos: {sst_total_efeitos:>10.2f}")
+    print(f"SSE: {ss_erro:>10.2f}")
+    print(f"Percentual da variação explicada: {variacao:>6.2f}%")
+    print("------------------------------------------------\n")
+
     # Cria um dicionário com os resultados caso queira usar depois
     resultados = {
         'efeitos_q': q,
-        'parcelas_sst': parcelas_sst,
-        'sst_total': sst_total_efeitos
+        'parcelas_ss': parcelas_sst,
+        'ss_modelo': sst_total_efeitos,
+        'ss_total': ss_total,
+        'ss_erro': ss_erro,
+        'variacao': variacao
     }
+
     return resultados
 
 

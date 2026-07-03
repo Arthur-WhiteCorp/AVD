@@ -19,6 +19,5 @@ docker compose run --rm app python src/tp1_3.2.py --db-host db --db-port 5432 --
 # 4) Executar o dashboard
 
 ```
-docker compose run --rm app python src/tp1_3.3.py --db-host db --db-port 5432 --db-name ecommerce --db-user postgres --db-pass postgres --output /app/out --product-asin [ asin do produto ]
-```
+docker compose run --rm app python src/tp1_3.3.py --db-host db --db-port 5432 --db-name ecommerce --db-user postgres --db-pass postgres --output /app/out --repeticoes 5```
 Caso não especificado o comando --output, o resultado da consulta será printado na tela.
