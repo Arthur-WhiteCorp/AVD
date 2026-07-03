@@ -1,0 +1,51 @@
+[
+	{
+		"id": 1,
+		"title": "5 melhores e 5 piores comentários de um produto",
+		"category": "Review Analysis Queries",
+		"sql": "-- Top 5 Melhores\nSELECT DATE,cutomer,rating,votes,helpful FROM REVIEW NATURAL INNER JOIN PRODUCT\nWHERE PRODUCT.ASIN = '0842328327'\nORDER BY rating DESC, helpful DESC \nLIMIT 5;\n\n-- Top 5 Piores\nSELECT DATE,cutomer,rating,votes,helpful FROM REVIEW NATURAL INNER JOIN PRODUCT\nWHERE PRODUCT.ASIN = '0842328327'\nORDER BY rating ASC, helpful DESC \nLIMIT 5;",
+		"explanation": "Recupera os 5 comentários com as maiores e as menores avaliações para um produto específico, utilizando a métrica de utilidade (helpful) como critério de desempate."
+	},
+	{
+		"id": 2,
+		"title": "Produtos similares com mais vendas",
+		"category": "Product Relationship Queries",
+		"sql": "SELECT tab_sim_prod.ASIN_SIM, tab_prod_info.salesrank FROM SIMILAR_PRODUCT tab_sim_prod\nJOIN PRODUCT tab_product ON tab_sim_prod.ASIN_SIM = tab_product.ASIN\nJOIN PRODUCT_INFO tab_prod_info ON tab_product.Pid = tab_prod_info.Pid\nWHERE tab_sim_prod.Pid = (SELECT Pid FROM PRODUCT WHERE ASIN = '0842328327') AND tab_prod_info.salesrank > (SELECT salesrank FROM PRODUCT_INFO WHERE Pid = (SELECT Pid FROM PRODUCT WHERE ASIN = '0842328327'))\nORDER BY tab_prod_info.salesrank DESC",
+		"explanation": "Lista os produtos similares ao produto informado que possuem um volume de vendas superior (salesrank maior) ao dele."
+	},
+	{
+		"id": 3,
+		"title": "Avaliação média diária de um produto",
+		"category": "Review Analysis Queries",
+		"sql": "SELECT REVIEW.date, AVG(REVIEW.rating) OVER (ORDER BY REVIEW.date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)\nAS media_diaria_avaliacoes\nFROM REVIEW\nJOIN PRODUCT ON PRODUCT.Pid= REVIEW.Pid\nWHERE PRODUCT.ASIN = '0842328327'\nORDER BY REVIEW.date",
+		"explanation": "Exibe a evolução temporal da média acumulada de avaliações de um produto específico ao longo do período registrado."
+	},
+	{
+		"id": 4,
+		"title": "Top 10 vendas por grupo",
+		"category": "Sales Rank & Popularity Queries",
+		"sql": "WITH ProdutosRankeados AS (\n    SELECT tab_product.ASIN, tab_prod_info.title, tab_prod_info.p_group, tab_prod_info.salesrank,\n    ROW_NUMBER() OVER (PARTITION BY tab_prod_info.p_group ORDER BY tab_prod_info.salesrank ASC) AS rn    \n    FROM PRODUCT tab_product\n    JOIN PRODUCT_INFO tab_prod_info ON tab_product.Pid = tab_prod_info.Pid\n)\nSELECT ASIN, title, p_group, salesrank\nFROM ProdutosRankeados\nWHERE rn <= 10\nORDER BY p_group, salesrank",
+		"explanation": "Identifica os 10 produtos líderes de vendas em cada categoria (grupo), utilizando o salesrank como critério de rankeamento."
+	},
+	{
+		"id": 5,
+		"title": "Top 10 média de avaliações úteis positivas por produto",
+		"category": "Review Analysis Queries",
+		"sql": "SELECT tab_review.Pid, AVG(tab_review.helpful) as media_avaliacoes_uteis\nFROM REVIEW tab_review\nGROUP BY tab_review.Pid\nORDER BY media_avaliacoes_uteis DESC\nLIMIT 10",
+		"explanation": "Lista os 10 produtos que possuem a maior média de votos de utilidade (helpful) em seus comentários."
+	},
+	{
+		"id": 6,
+		"title": "Top 5 categorias com maior média de avaliações úteis positivas",
+		"category": "Category Analysis Queries",
+		"sql": "SELECT tab_category.cat_nome, AVG(tab_review.helpful) as media_avaliacoes_uteis\nFROM REVIEW as tab_review\nJOIN PRODUCT_CAT AS tab_prod_cat ON tab_review.Pid= tab_prod_cat.Pid\nJOIN CATEGORY AS tab_category ON tab_prod_cat.id_final_cat= tab_category.cat_id\nGROUP BY tab_category.cat_nome\nORDER BY media_avaliacoes_uteis DESC\nLIMIT 5",
+		"explanation": "Determina as 5 categorias de produtos que apresentam a melhor média de avaliações úteis positivas entre seus itens."
+	},
+	{
+		"id": 7,
+		"title": "Top 10 clientes com mais comentários por grupo",
+		"category": "Customer Activity Queries",
+		"sql": "WITH ClientesRankeados AS (\n    SELECT tab_review.cutomer, tab_prod_info.p_group, COUNT(*) as total_comentarios,\n    ROW_NUMBER() OVER (PARTITION BY tab_prod_info.p_group ORDER BY COUNT(*) DESC) AS rn    \n    FROM REVIEW AS tab_review\n    JOIN PRODUCT_INFO AS tab_prod_info ON tab_review.Pid= tab_prod_info.Pid\n    GROUP BY tab_review.cutomer, tab_prod_info.p_group\n)\nSELECT cutomer, p_group, total_comentarios\nFROM ClientesRankeados\nWHERE rn <= 10\nORDER BY p_group, total_comentarios DESC",
+		"explanation": "Lista os 10 clientes mais ativos em número de comentários realizados, segmentados por cada grupo de produto."
+	}
+]

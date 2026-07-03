@@ -1,0 +1,15 @@
+{
+    "timestamp_inicio": "2026-07-02 20:13:20",
+    "sistema_avaliado": "sistema_giovana",
+    "versao_banco": "PostgreSQL 16",
+    "dataset": "amazon_2006",
+    "total_queries": 100,
+    "warmup_execucoes": 5,
+    "sistema_operacional": "Linux-6.17.0-35-generic-x86_64-with-glibc2.41",
+    "hostname": "3e63f0a104f7",
+    "usuario_execucao": "root",
+    "python_versao": "3.11.15",
+    "processador": "",
+    "arquitetura": "x86_64",
+    "observacoes": "Benchmark executado localmente com workload fixo."
+}

@@ -1,0 +1,8 @@
+run;sistema;query_id;metrica;valor;unidade;num_tuplas;tempo_ms;timestamp;observacao
+1;Postgres_Original;1;TP/ms;0.0002;tuplas/ms;1;4336.9875;2026-05-06 13:15:04;frio
+1;Postgres_Original;2;TP/ms;0.0000;tuplas/ms;0;22.7837;2026-05-06 13:15:04;frio
+1;Postgres_Original;3;TP/ms;0.0058;tuplas/ms;1;173.4689;2026-05-06 13:15:04;frio
+1;Postgres_Original;4;TP/ms;0.0363;tuplas/ms;59;1626.1437;2026-05-06 13:15:06;frio
+1;Postgres_Original;5;TP/ms;0.0102;tuplas/ms;10;975.9950;2026-05-06 13:15:07;frio
+1;Postgres_Original;6;TP/ms;0.0015;tuplas/ms;5;3442.9806;2026-05-06 13:15:10;frio
+1;Postgres_Original;7;TP/ms;0.0136;tuplas/ms;73;5377.8082;2026-05-06 13:15:16;frio

@@ -1,0 +1,600 @@
+Here are 50 SQL queries for the given product database schema, each with a short explanation of its purpose.
+
+### Basic Product Queries
+
+1. **Get all products with their basic information**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.p_group, pi.salesrank, pi.avg_rating
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid;
+```
+*Explanation:* Retrieves the complete product catalog showing ID, ASIN, title, group, sales rank, and average rating.
+
+2. **Find products that have no associated product info**
+```sql
+SELECT p.Pid, p.ASIN
+FROM PRODUCT p
+LEFT JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE pi.Pid IS NULL;
+```
+*Explanation:* Identifies products that exist in the PRODUCT table but lack detailed information in PRODUCT_INFO.
+
+3. **Search for products with 'Harry Potter' in the title**
+```sql
+SELECT Pid, ASIN, title
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE pi.title LIKE '%Harry Potter%';
+```
+*Explanation:* Performs a case-sensitive substring search for book titles containing "Harry Potter".
+
+4. **List all distinct product groups (categories) available**
+```sql
+SELECT DISTINCT p_group
+FROM PRODUCT_INFO
+WHERE p_group IS NOT NULL
+ORDER BY p_group;
+```
+*Explanation:* Shows the unique types of products in the database (e.g., 'Book', 'DVD', 'Music').
+
+5. **Count total number of products per group**
+```sql
+SELECT p_group, COUNT(*) AS product_count
+FROM PRODUCT_INFO
+GROUP BY p_group
+ORDER BY product_count DESC;
+```
+*Explanation:* Provides a breakdown of how many items exist in each product category.
+
+### Sales Rank & Popularity Queries
+
+6. **Get the top 100 best-selling products (lowest salesrank)**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.salesrank
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE pi.salesrank IS NOT NULL AND pi.salesrank > 0
+ORDER BY pi.salesrank ASC
+LIMIT 100;
+```
+*Explanation:* Retrieves the 100 products with the highest sales (lowest sales rank number, e.g., #1 bestseller).
+
+7. **Find products with no sales rank recorded**
+```sql
+SELECT Pid, title
+FROM PRODUCT_INFO
+WHERE salesrank IS NULL OR salesrank = 0;
+```
+*Explanation:* Lists products that either have never sold or lack sales rank data.
+
+8. **Average sales rank by product group**
+```sql
+SELECT p_group, AVG(salesrank) AS avg_salesrank
+FROM PRODUCT_INFO
+WHERE salesrank > 0
+GROUP BY p_group;
+```
+*Explanation:* Calculates the typical sales rank performance for each category (lower is better).
+
+9. **Products with sales rank improvement potential (high rank number)**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.salesrank
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE pi.salesrank > 100000
+ORDER BY pi.salesrank DESC
+LIMIT 50;
+```
+*Explanation:* Finds the bottom-selling products (very high rank numbers) that might need marketing attention.
+
+10. **Median sales rank calculation using window function**
+```sql
+WITH ranked AS (
+  SELECT salesrank, 
+         ROW_NUMBER() OVER (ORDER BY salesrank) AS rn,
+         COUNT(*) OVER () AS total
+  FROM PRODUCT_INFO
+  WHERE salesrank > 0
+)
+SELECT AVG(salesrank) AS median_salesrank
+FROM ranked
+WHERE rn IN (FLOOR((total+1)/2), CEIL((total+1)/2));
+```
+*Explanation:* Computes the median sales rank across all products, which is more robust to outliers than average.
+
+### Category & Hierarchy Queries
+
+11. **Find all categories and their parent categories**
+```sql
+SELECT c.cat_id, c.cat_nome, p.cat_nome AS parent_category
+FROM CATEGORY c
+LEFT JOIN CATEGORY p ON c.pcat_id = p.cat_id
+ORDER BY c.cat_id;
+```
+*Explanation:* Displays the category tree showing each category and its immediate parent.
+
+12. **Get the full path of a specific category (recursive query)**
+```sql
+WITH RECURSIVE cat_path AS (
+  SELECT cat_id, cat_nome, pcat_id, cat_nome AS full_path
+  FROM CATEGORY
+  WHERE cat_nome = 'Books'  -- starting category
+  UNION ALL
+  SELECT c.cat_id, c.cat_nome, c.pcat_id, CONCAT(cp.full_path, ' > ', c.cat_nome)
+  FROM CATEGORY c
+  JOIN cat_path cp ON c.pcat_id = cp.cat_id
+)
+SELECT * FROM cat_path;
+```
+*Explanation:* Shows the entire hierarchy path from a root category down to all subcategories (using recursive CTE).
+
+13. **List all products belonging to a specific category (e.g., 'Science Fiction')**
+```sql
+SELECT p.Pid, p.ASIN, pi.title
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN PRODUCT_CAT pc ON p.Pid = pc.Pid
+JOIN CATEGORY c ON pc.id_final_cat = c.cat_id
+WHERE c.cat_nome = 'Science Fiction';
+```
+*Explanation:* Retrieves all products classified under the "Science Fiction" category.
+
+14. **Count products per category (leaf nodes)**
+```sql
+SELECT c.cat_id, c.cat_nome, COUNT(pc.Pid) AS product_count
+FROM CATEGORY c
+LEFT JOIN PRODUCT_CAT pc ON c.cat_id = pc.id_final_cat
+GROUP BY c.cat_id, c.cat_nome
+ORDER BY product_count DESC;
+```
+*Explanation:* Shows how many products are directly assigned to each final category.
+
+15. **Find categories with no products assigned**
+```sql
+SELECT c.cat_id, c.cat_nome
+FROM CATEGORY c
+LEFT JOIN PRODUCT_CAT pc ON c.cat_id = pc.id_final_cat
+WHERE pc.id_final_cat IS NULL;
+```
+*Explanation:* Identifies unused categories that could be removed or need product assignment.
+
+16. **Products that belong to multiple categories**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, COUNT(pc.id_final_cat) AS category_count
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN PRODUCT_CAT pc ON p.Pid = pc.Pid
+GROUP BY p.Pid, p.ASIN, pi.title
+HAVING COUNT(pc.id_final_cat) > 1
+ORDER BY category_count DESC;
+```
+*Explanation:* Finds products that are cross-listed in more than one category.
+
+17. **Top 5 categories with highest average product rating**
+```sql
+SELECT c.cat_id, c.cat_nome, AVG(pi.avg_rating) AS avg_category_rating
+FROM CATEGORY c
+JOIN PRODUCT_CAT pc ON c.cat_id = pc.id_final_cat
+JOIN PRODUCT_INFO pi ON pc.Pid = pi.Pid
+WHERE pi.avg_rating IS NOT NULL
+GROUP BY c.cat_id, c.cat_nome
+ORDER BY avg_category_rating DESC
+LIMIT 5;
+```
+*Explanation:* Ranks categories by the average rating of their products, indicating overall customer satisfaction per category.
+
+### Similar Products Queries
+
+18. **Find all similar products for a given product ASIN**
+```sql
+SELECT p2.ASIN AS similar_ASIN, pi2.title AS similar_title
+FROM PRODUCT p1
+JOIN SIMILAR_PRODUCT sp ON p1.Pid = sp.Pid
+JOIN PRODUCT p2 ON sp.ASIN_SIM = p2.ASIN
+JOIN PRODUCT_INFO pi2 ON p2.Pid = pi2.Pid
+WHERE p1.ASIN = 'B000FA5E4K';
+```
+*Explanation:* Retrieves the list of similar/recommended products for a specific ASIN (e.g., "B000FA5E4K").
+
+19. **Count how many times each product is listed as similar to others**
+```sql
+SELECT p.ASIN, pi.title, COUNT(sp.Pid) AS times_recommended
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+LEFT JOIN SIMILAR_PRODUCT sp ON p.ASIN = sp.ASIN_SIM
+GROUP BY p.Pid, p.ASIN, pi.title
+ORDER BY times_recommended DESC
+LIMIT 100;
+```
+*Explanation:* Finds the most frequently co-recommended products, indicating popularity or strong relationships.
+
+20. **Products that are not similar to any other product**
+```sql
+SELECT p.Pid, p.ASIN, pi.title
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE NOT EXISTS (
+  SELECT 1 FROM SIMILAR_PRODUCT sp WHERE sp.Pid = p.Pid OR sp.ASIN_SIM = p.ASIN
+);
+```
+*Explanation:* Lists products that have no similarity relationships defined (isolated items).
+
+21. **Find mutual similar relationships (A similar to B and B similar to A)**
+```sql
+SELECT p1.ASIN AS product_A, p2.ASIN AS product_B
+FROM SIMILAR_PRODUCT sp1
+JOIN SIMILAR_PRODUCT sp2 ON sp1.ASIN_SIM = sp2.ASIN_SIM AND sp1.Pid = sp2.Pid
+JOIN PRODUCT p1 ON sp1.Pid = p1.Pid
+JOIN PRODUCT p2 ON sp1.ASIN_SIM = p2.ASIN
+WHERE EXISTS (
+  SELECT 1 FROM SIMILAR_PRODUCT sp3
+  WHERE sp3.Pid = p2.Pid AND sp3.ASIN_SIM = p1.ASIN
+);
+```
+*Explanation:* Identifies pairs of products that both recommend each other as similar.
+
+### Review & Rating Queries
+
+22. **Get all reviews for a specific product with helpfulness ratio**
+```sql
+SELECT rev_id, date, cutomer, rating, votes, helpful,
+       CASE WHEN votes > 0 THEN ROUND(helpful * 100.0 / votes, 1) ELSE 0 END AS helpful_pct
+FROM REVIEW
+WHERE Pid = 12345
+ORDER BY date DESC;
+```
+*Explanation:* Displays all customer reviews for a product, including the percentage of people who found each review helpful.
+
+23. **Top 10 products with the highest average rating (minimum 50 reviews)**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.avg_rating, pi.reviews
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE pi.reviews >= 50
+ORDER BY pi.avg_rating DESC
+LIMIT 10;
+```
+*Explanation:* Finds the highest-rated products that have a statistically significant number of reviews.
+
+24. **Products with most 5-star reviews**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, COUNT(r.rev_id) AS five_star_count
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN REVIEW r ON p.Pid = r.Pid
+WHERE r.rating = 5
+GROUP BY p.Pid, p.ASIN, pi.title
+ORDER BY five_star_count DESC
+LIMIT 20;
+```
+*Explanation:* Ranks products based on the sheer volume of perfect ratings.
+
+25. **Identify products with high rating but low helpful reviews**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.avg_rating,
+       AVG(r.helpful * 1.0 / NULLIF(r.votes,0)) AS avg_helpfulness
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN REVIEW r ON p.Pid = r.Pid
+GROUP BY p.Pid, p.ASIN, pi.title, pi.avg_rating
+HAVING pi.avg_rating > 4.0 AND AVG(r.helpful * 1.0 / NULLIF(r.votes,0)) < 0.5;
+```
+*Explanation:* Detects products that have high star ratings but where the reviews are not considered helpful by other users (potential fake review indicator).
+
+26. **Monthly review volume trend for a product**
+```sql
+SELECT DATE_TRUNC('month', date) AS month, COUNT(*) AS review_count, AVG(rating) AS avg_rating
+FROM REVIEW
+WHERE Pid = 12345
+GROUP BY DATE_TRUNC('month', date)
+ORDER BY month;
+```
+*Explanation:* Shows how many reviews a product receives per month and how the average rating changes over time.
+
+27. **Find customers who have reviewed the same product multiple times**
+```sql
+SELECT Pid, cutomer, COUNT(*) AS review_count
+FROM REVIEW
+GROUP BY Pid, cutomer
+HAVING COUNT(*) > 1;
+```
+*Explanation:* Identifies duplicate reviews by the same customer on a single product (possible data issue or updated reviews).
+
+28. **Reviews with the highest 'helpful' vote counts**
+```sql
+SELECT r.rev_id, p.ASIN, pi.title, r.cutomer, r.helpful, r.votes, r.rating
+FROM REVIEW r
+JOIN PRODUCT p ON r.Pid = p.Pid
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE r.helpful > 100
+ORDER BY r.helpful DESC
+LIMIT 50;
+```
+*Explanation:* Retrieves the most influential reviews based on the number of people who found them helpful.
+
+29. **Distribution of ratings (1-5 stars) across all products**
+```sql
+SELECT rating, COUNT(*) AS count,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS percentage
+FROM REVIEW
+GROUP BY rating
+ORDER BY rating DESC;
+```
+*Explanation:* Provides an overall histogram of star ratings to see if reviews skew positive or negative.
+
+30. **Find products where average rating differs significantly from recent reviews**
+```sql
+WITH recent_avg AS (
+  SELECT Pid, AVG(rating) AS recent_avg_rating
+  FROM REVIEW
+  WHERE date >= CURRENT_DATE - INTERVAL '90 days'
+  GROUP BY Pid
+)
+SELECT p.Pid, p.ASIN, pi.title, pi.avg_rating AS overall_avg, ra.recent_avg_rating
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN recent_avg ra ON p.Pid = ra.Pid
+WHERE ABS(pi.avg_rating - ra.recent_avg_rating) > 1.0
+ORDER BY ABS(pi.avg_rating - ra.recent_avg_rating) DESC;
+```
+*Explanation:* Identifies products whose recent rating trend is moving up or down compared to their historical average.
+
+### Complex Analytical Queries
+
+31. **Find the most frequently purchased together items (via similar products)**
+```sql
+SELECT p1.ASIN AS product, p2.ASIN AS also_bought, COUNT(*) AS frequency
+FROM SIMILAR_PRODUCT sp1
+JOIN SIMILAR_PRODUCT sp2 ON sp1.Pid = sp2.Pid AND sp1.ASIN_SIM < sp2.ASIN_SIM
+JOIN PRODUCT p1 ON sp1.ASIN_SIM = p1.ASIN
+JOIN PRODUCT p2 ON sp2.ASIN_SIM = p2.ASIN
+GROUP BY p1.ASIN, p2.ASIN
+ORDER BY frequency DESC
+LIMIT 50;
+```
+*Explanation:* Uses similarity relationships to infer frequently co-purchased item pairs (market basket analysis).
+
+32. **Rank products within each category by sales rank**
+```sql
+SELECT c.cat_nome, p.ASIN, pi.title, pi.salesrank,
+       RANK() OVER (PARTITION BY c.cat_id ORDER BY pi.salesrank ASC) AS rank_in_category
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN PRODUCT_CAT pc ON p.Pid = pc.Pid
+JOIN CATEGORY c ON pc.id_final_cat = c.cat_id
+WHERE pi.salesrank IS NOT NULL AND pi.salesrank > 0;
+```
+*Explanation:* Shows the bestseller position of each product relative only to other items in its specific category.
+
+33. **Identify "cold start" products (new with few reviews) but good sales rank**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.salesrank, pi.reviews
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE pi.salesrank BETWEEN 1 AND 1000
+  AND (pi.reviews IS NULL OR pi.reviews < 10)
+ORDER BY pi.salesrank ASC;
+```
+*Explanation:* Finds best-selling products that lack sufficient reviews, representing opportunities for early review solicitation.
+
+34. **Correlation between number of similar products and sales rank**
+```sql
+SELECT sim_count_range, AVG(pi.salesrank) AS avg_salesrank, COUNT(*) AS product_count
+FROM (
+  SELECT p.Pid, COUNT(sp.ASIN_SIM) AS sim_count,
+         CASE
+           WHEN COUNT(sp.ASIN_SIM) = 0 THEN '0 similar'
+           WHEN COUNT(sp.ASIN_SIM) BETWEEN 1 AND 5 THEN '1-5 similar'
+           WHEN COUNT(sp.ASIN_SIM) BETWEEN 6 AND 20 THEN '6-20 similar'
+           ELSE '>20 similar'
+         END AS sim_count_range
+  FROM PRODUCT p
+  LEFT JOIN SIMILAR_PRODUCT sp ON p.Pid = sp.Pid
+  GROUP BY p.Pid
+) sim_stats
+JOIN PRODUCT_INFO pi ON sim_stats.Pid = pi.Pid
+WHERE pi.salesrank > 0
+GROUP BY sim_count_range
+ORDER BY avg_salesrank;
+```
+*Explanation:* Investigates whether having more similar/recommended products correlates with better sales rank.
+
+35. **Most reviewed products per month in the last year**
+```sql
+WITH monthly_reviews AS (
+  SELECT DATE_TRUNC('month', date) AS month, Pid, COUNT(*) AS rev_count,
+         RANK() OVER (PARTITION BY DATE_TRUNC('month', date) ORDER BY COUNT(*) DESC) AS rnk
+  FROM REVIEW
+  WHERE date >= CURRENT_DATE - INTERVAL '1 year'
+  GROUP BY DATE_TRUNC('month', date), Pid
+)
+SELECT mr.month, p.ASIN, pi.title, mr.rev_count
+FROM monthly_reviews mr
+JOIN PRODUCT p ON mr.Pid = p.Pid
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE mr.rnk <= 5
+ORDER BY mr.month DESC, mr.rnk ASC;
+```
+*Explanation:* Shows the top 5 most buzzworthy products each month based on review activity.
+
+36. **Products that are top 10% in sales rank within their group**
+```sql
+WITH group_percentiles AS (
+  SELECT Pid, p_group, salesrank,
+         PERCENT_RANK() OVER (PARTITION BY p_group ORDER BY salesrank ASC) AS pct_rank
+  FROM PRODUCT_INFO
+  WHERE salesrank > 0
+)
+SELECT pi.Pid, p.ASIN, pi.title, pi.p_group, pi.salesrank
+FROM group_percentiles gp
+JOIN PRODUCT_INFO pi ON gp.Pid = pi.Pid
+JOIN PRODUCT p ON pi.Pid = p.Pid
+WHERE gp.pct_rank <= 0.10
+ORDER BY pi.p_group, pi.salesrank;
+```
+*Explanation:* Identifies the best-selling items within each product category (top 10% of sales performance).
+
+37. **Average rating by day of week for reviews posted**
+```sql
+SELECT EXTRACT(DOW FROM date) AS day_of_week,
+       TO_CHAR(date, 'Day') AS day_name,
+       AVG(rating) AS avg_rating,
+       COUNT(*) AS review_count
+FROM REVIEW
+GROUP BY EXTRACT(DOW FROM date), TO_CHAR(date, 'Day')
+ORDER BY day_of_week;
+```
+*Explanation:* Checks if ratings tend to be higher or lower depending on the day of the week a review was written.
+
+38. **Find products that are similar to the top 10 bestsellers**
+```sql
+WITH top_products AS (
+  SELECT Pid FROM PRODUCT_INFO WHERE salesrank > 0 ORDER BY salesrank ASC LIMIT 10
+)
+SELECT DISTINCT p.ASIN, pi.title
+FROM top_products tp
+JOIN SIMILAR_PRODUCT sp ON tp.Pid = sp.Pid
+JOIN PRODUCT p ON sp.ASIN_SIM = p.ASIN
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+WHERE p.Pid NOT IN (SELECT Pid FROM top_products)
+LIMIT 100;
+```
+*Explanation:* Recommends items that are frequently similar to current bestsellers (a simple recommendation engine).
+
+39. **Create a view for "Books" category with all relevant data**
+```sql
+CREATE VIEW v_books AS
+SELECT p.Pid, p.ASIN, pi.title, pi.salesrank, pi.avg_rating, pi.reviews,
+       c.cat_nome AS category_name
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+JOIN PRODUCT_CAT pc ON p.Pid = pc.Pid
+JOIN CATEGORY c ON pc.id_final_cat = c.cat_id
+WHERE c.cat_nome = 'Books' OR c.cat_nome LIKE '%Book%';
+```
+*Explanation:* Creates a convenient view for querying only book products, simplifying future analysis.
+
+40. **Identify potential duplicate products based on title similarity**
+```sql
+SELECT p1.Pid AS pid1, p1.ASIN AS asin1, p2.Pid AS pid2, p2.ASIN AS asin2,
+       pi1.title AS title1, pi2.title AS title2
+FROM PRODUCT p1
+JOIN PRODUCT_INFO pi1 ON p1.Pid = pi1.Pid
+JOIN PRODUCT p2 ON p1.Pid < p2.Pid
+JOIN PRODUCT_INFO pi2 ON p2.Pid = pi2.Pid
+WHERE SOUNDEX(pi1.title) = SOUNDEX(pi2.title)
+  AND LEVENSHTEIN(pi1.title, pi2.title) < 10;
+```
+*Explanation:* Uses fuzzy string matching to find products with nearly identical titles that might be duplicate listings.
+
+41. **For each customer, find their average rating given**
+```sql
+SELECT cutomer, COUNT(*) AS reviews_written, AVG(rating) AS avg_rating_given,
+       SUM(helpful) AS total_helpful_votes
+FROM REVIEW
+GROUP BY cutomer
+ORDER BY reviews_written DESC
+LIMIT 100;
+```
+*Explanation:* Profiles the most active reviewers by their rating tendencies and helpfulness impact.
+
+42. **Products with no reviews in the last 6 months**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, MAX(r.date) AS last_review_date
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+LEFT JOIN REVIEW r ON p.Pid = r.Pid
+GROUP BY p.Pid, p.ASIN, pi.title
+HAVING MAX(r.date) < CURRENT_DATE - INTERVAL '6 months' OR MAX(r.date) IS NULL;
+```
+*Explanation:* Identifies products that are losing review momentum and may need a promotional boost.
+
+43. **Average helpful votes per review by product group**
+```sql
+SELECT pi.p_group, AVG(r.helpful) AS avg_helpful_votes, AVG(r.votes) AS avg_total_votes
+FROM REVIEW r
+JOIN PRODUCT_INFO pi ON r.Pid = pi.Pid
+GROUP BY pi.p_group
+ORDER BY avg_helpful_votes DESC;
+```
+*Explanation:* Compares the engagement level of reviews across different product categories.
+
+44. **Find all leaf categories under a specific parent category**
+```sql
+WITH RECURSIVE subcats AS (
+  SELECT cat_id FROM CATEGORY WHERE cat_nome = 'Electronics'
+  UNION ALL
+  SELECT c.cat_id FROM CATEGORY c JOIN subcats s ON c.pcat_id = s.cat_id
+)
+SELECT c.cat_id, c.cat_nome
+FROM subcats s
+JOIN CATEGORY c ON s.cat_id = c.cat_id
+WHERE NOT EXISTS (SELECT 1 FROM CATEGORY child WHERE child.pcat_id = c.cat_id);
+```
+*Explanation:* Retrieves only the bottom-most categories (leaf nodes) under a high-level category like "Electronics".
+
+45. **Products that have a sales rank but no categories assigned**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.salesrank
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+LEFT JOIN PRODUCT_CAT pc ON p.Pid = pc.Pid
+WHERE pc.id_final_cat IS NULL AND pi.salesrank > 0;
+```
+*Explanation:* Finds active selling products that are missing category classification (data quality issue).
+
+46. **Reviews that mention "battery" in a hypothetical review text column (if existed)**
+*Note: The schema lacks a review text column, but we can simulate a similar analysis.*
+```sql
+-- This is a conceptual query; assumes a 'review_text' column exists.
+SELECT r.rev_id, p.ASIN, pi.title, r.rating, r.cutomer
+FROM REVIEW r
+JOIN PRODUCT p ON r.Pid = p.Pid
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+-- WHERE r.review_text LIKE '%battery%'
+ORDER BY r.date DESC;
+```
+*Explanation:* Searches for reviews containing a specific keyword to understand product sentiment about a feature (e.g., battery life). (Commented out since column not present.)
+
+47. **Total downloads (assuming 'downloads' counts digital purchases) per product group**
+```sql
+SELECT pi.p_group, SUM(pi.downloads) AS total_downloads
+FROM PRODUCT_INFO pi
+GROUP BY pi.p_group
+ORDER BY total_downloads DESC;
+```
+*Explanation:* Aggregates download metrics to see which product categories are most popular in digital format.
+
+48. **Find products where the number of similar items is greater than the number of reviews**
+```sql
+SELECT p.Pid, p.ASIN, pi.title, pi.reviews, COUNT(sp.ASIN_SIM) AS similar_count
+FROM PRODUCT p
+JOIN PRODUCT_INFO pi ON p.Pid = pi.Pid
+LEFT JOIN SIMILAR_PRODUCT sp ON p.Pid = sp.Pid
+GROUP BY p.Pid, p.ASIN, pi.title, pi.reviews
+HAVING COUNT(sp.ASIN_SIM) > pi.reviews
+ORDER BY similar_count DESC;
+```
+*Explanation:* Identifies products that have a rich set of recommendations but very few actual customer reviews.
+
+49. **Top 10 most helpful reviewers overall**
+```sql
+SELECT cutomer, SUM(helpful) AS total_helpful_votes, COUNT(*) AS reviews_count
+FROM REVIEW
+GROUP BY cutomer
+ORDER BY total_helpful_votes DESC
+LIMIT 10;
+```
+*Explanation:* Ranks reviewers based on the total helpful votes they have accumulated across all their reviews.
+
+50. **Simulate a "Customers who bought this also bought..." query using similar products**
+```sql
+SELECT sp.ASIN_SIM AS recommended_ASIN, pi.title AS recommended_title, COUNT(*) AS frequency
+FROM SIMILAR_PRODUCT sp
+JOIN PRODUCT_INFO pi ON sp.ASIN_SIM = pi.ASIN
+WHERE sp.Pid IN (SELECT Pid FROM PRODUCT WHERE ASIN = 'B000FA5E4K')
+GROUP BY sp.ASIN_SIM, pi.title
+ORDER BY frequency DESC
+LIMIT 10;
+```
+*Explanation:* Given a specific product ASIN, returns the most frequently co-purchased/similar items across all customers who viewed/bought that item.
